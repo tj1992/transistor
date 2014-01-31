@@ -12,11 +12,49 @@ Color Color::GREEN = Color(0, 0xFF, 0);
 Color Color::BLUE = Color(0, 0, 0xFF);
 
 //////////////////////////////////////////////////////////////////////
+//	class Event_manager
+//////////////////////////////////////////////////////////////////////
+
+//	Event_manager : sets the defaults
+Event_manager::Event_manager() {
+	// TODO: add init code here
+}	
+	
+//	Event_manager : free up the resources
+Event_manager::~Event_manager() {
+	// TODO: add term code here
+}
+
+//	Event_manager::add_handler : adds an handler for events
+void Event_manager::add_handler(Event_handler& handler) {
+	handlers.push_back(handler);		// add to handlers' list
+}
+
+//	Event_manager::remove_handler : remove the handler from list
+void Event_manager::remove_handler(Event_handler& handler) {
+	for (Handler_iterator iter = handlers.begin(); iter != handlers.end(); ++iter)	// iterate over the handlers' list
+		if (*iter == handler) {			// found matching handler?
+			handlers.erase(iter);		// remove it from the list
+			break;
+		}
+}
+
+//	Event_manager::poll_handle: poll and handle events
+void Event_manager::poll_handle() {
+	while (SDL_PollEvent(&e)) {		// get an event
+		for (Handler_iterator iter = handlers.begin(); iter != handlers.end(); ++iter) {	// iterate over the handlers
+			if ((iter->event_type() & e.type)	// match the types
+				iter->handle_event(e);		// pass to handler
+		}
+	}
+}
+
+//////////////////////////////////////////////////////////////////////
 //	class Window
 //////////////////////////////////////////////////////////////////////
 
 
-//	default constructor for 'Window'. Just sets the different params to default values
+//	Window : default constructor for 'Window'. Just sets the different params to default values
 Window::Window() {
 	*this = Window("Unnamed Window");
 }
@@ -24,7 +62,8 @@ Window::Window() {
 //	Window : sets the title to string 's'
 Window::Window(const string& s) :
 	win(nullptr),
-	whidden(true)		// 'Window' is hidden
+	whidden(true),		// 'Window' is hidden
+	wquit(false)
 {
 	wrect.x = SDL_WINDOWPOS_UNDEFINED;
 	wrect.y = SDL_WINDOWPOS_UNDEFINED;
@@ -73,6 +112,23 @@ void Window::resize(int w, int h) {
 	wrect.h = h > 0 ? h : DEFAULT_HEIGHT;	// do not accept -ve height
 
 	SDL_SetWindowSize(win, wrect.w, wrect.h);	// upadate size
+}
+
+//	Window::handle_event : handle the event supplied
+void Window::handle_event(const SDL_Event& event) {
+	switch (event.window.event) {
+	case SDL_WINDOWEVENT_SHOWN:		// window is now visible
+		whidden = false;
+		break;
+	case SDL_WINDOWEVENT_HIDDEN:		// window is now hidden
+		whidden = true;
+		break;
+	case SDL_WINDOWEVENT_CLOSE:		// user pressed 'x' button
+		wquit = true;
+		break;
+	default:
+		SDL_Log("Window %d got event %d", event.window.windowID, event.window.event);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////

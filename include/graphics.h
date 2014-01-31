@@ -3,6 +3,7 @@
 
 #include <iostream>	// for error reporting to 'cerr'
 #include <string>	// for std::string
+#include <vector>	// for std::vector
 
 #include <SDL.h>
 #include <SDL_image.h>
@@ -46,7 +47,7 @@ public:
 
 	Exception(string str) : msg(str) {	}
 
-	string what() const {		// called after 'catch'
+	virtual string what() const {		// called after 'catch'
 		return msg;
 	}
 
@@ -90,11 +91,29 @@ private:
 	SDL_Color col;
 };
 
-/*	Window : wrapper for SDL_Window	*/
-class Window {
+/*	Event_handler : An abstract event-handler class. All event-handlers must subclass it	*/
+class Event_handler {
 public:
-	class Bad_Window :public Exception {	// prefixes 'what()' with "Bad_Window: "
-	public:
+	// handle the event passed (NOTE: keep the function small as it is called for every event received by Event_manager)
+	virtual void handle_event(const SDL_Event&)	{	}
+
+	// returns the event type the handler is interested in
+	virtual Uint32 event_type() const		{	return 0;	}
+};
+
+/*	Event_manager : wrapper for SDL_Event. Combined with 'Event_handler' provides a neat way of handling events	*/
+class Event_manager {
+public:
+	Event_manager();
+
+	~Event_manager();
+
+	void add_handler(Event_handler&);
+	void remove_handler(Event_handler&);
+
+	void poll_handle();
+	
+	//bool add_source();
 		Bad_Window(string m) : Exception(m) {	}
 		string what() const {	return "Bad_Window: "+Exception::what();	}
 	};
@@ -124,13 +143,22 @@ public:
 	const string& title() const	{	return wtitle;					}
 	void title(const string& s)	{	wtitle = s.length() ? s : "Unnamed Window"; /* do not accept empty title */}
 
-	bool is_hidden() const;	// returns true if the 'Window' is minimized or is not visible
+	// returns true if the 'Window' is minimized or is not visible
+	bool is_hidden() const		{	return whidden;					}
 
+	// returns true if user pressed 'x' button of window
+	bool quit() const		{	return wquit;					}	
+
+	void handle_event(const SDL_Event& event);	// event handler for window
+
+	// returns the interested events' types
+	Uint32 event_type() const	{	return SDL_WINDOWEVENT;				}
 private:
 	SDL_Window* win; // pointer to SDL_Window
 	string wtitle;	// title of 'Window' displayed by Window Manager
 	SDL_Rect wrect; // dimensions of 'Window'; SDL_Rect { int x, int y, int w, int h }
 	bool whidden;	// hidden flag for 'Window' (useful for preventing offscreen rendering and resultant slowdown)
+	bool wquit;	// quit flag; gets 'true' after receiving QUIT event
 };
 
 /*	Renderer : wrapper for SDL_Renderer	*/

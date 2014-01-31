@@ -8,8 +8,11 @@ int main() {
 		return 1;
 	}
 	try {
+		Event_manager eman;
+
 		Window win;
 		win.init();
+		eman.add(win);
 
 		win.pos(Point(0, 0));
 		win.resize(1000, 1000);
@@ -30,7 +33,10 @@ int main() {
 
 		ren.render_screen();
 
-		SDL_Delay(5000);
+		while (!win.quit()) {
+			eman.poll_handle();
+		}
+
 	}
 	catch (Exception& e) {
 		cerr<<"Exception : "<<e.what()<<'\n';;
