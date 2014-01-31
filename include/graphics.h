@@ -95,10 +95,8 @@ private:
 class Event_handler {
 public:
 	// handle the event passed (NOTE: keep the function small as it is called for every event received by Event_manager)
-	virtual void handle_event(const SDL_Event&)	{	}
-
-	// returns the event type the handler is interested in
-	virtual Uint32 event_type() const		{	return 0;	}
+	virtual void handle_event(const SDL_Event&) = 0;
+	virtual Uint32 event_type() const = 0;			// returns the event type the instance is interested in
 };
 
 /*	Event_manager : wrapper for SDL_Event. Combined with 'Event_handler' provides a neat way of handling events	*/
@@ -114,6 +112,18 @@ public:
 	void poll_handle();
 	
 	//bool add_source();
+	typedef vector <Event_handler&>::iterator Handler_iterator;
+
+private:
+	SDL_Event event;
+	vector <Event_handler&> handlers;
+}
+
+/*	Window : wrapper for SDL_Window. Also an Event_handler	*/
+class Window : public Event_handler {
+public:
+	class Bad_Window :public Exception {	// prefixes 'what()' with "Bad_Window: "
+	public:
 		Bad_Window(string m) : Exception(m) {	}
 		string what() const {	return "Bad_Window: "+Exception::what();	}
 	};
