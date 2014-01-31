@@ -184,18 +184,25 @@ void Renderer::draw_color(Color c) {
 	}
 }
 
+//	Renderer::reset_render_target : reset the render target
+void Renderer::reset_render_target() {
+	if (SDL_SetRenderTarget(ren, nullptr) != 0) {
+		throw Bad_Renderer(__func__ + string(": SDL_SetRenderTarget failed!\nSDL Error: ") + SDL_GetError());
+	}
+}
+
 //////////////////////////////////////////////////////////////////////
 //	class Texture
 //////////////////////////////////////////////////////////////////////
 
 //	Texture : sets the defaults
-Texture::Texture(SDL_Renderer* renderer) :
+Texture::Texture(Renderer& renderer) :
 	tex(nullptr),
 	color_key(Color::BLACK),
 	tw(0),
 	th(0)
 {
-	ren = renderer;
+	ren = renderer.renderer();
 }
 
 //	~Texture : delete the Texture
@@ -281,10 +288,11 @@ void Texture::render(const Point p, const SDL_Rect* clip, double angle, const Po
 }
 
 //	Texture::set_render_target : set the texture as rendering target
-void Texture::set_render_target() {
-	free();		// free the current Texture
+void Texture::set_render_target(int w, int h) {
+	free();
+	
+	create_blank(w, h, SDL_TEXTUREACCESS_TARGET);
 
-	create_blank(tw, th, SDL_TEXTUREACCESS_TARGET);		// create a blank target texture
 	if (SDL_SetRenderTarget(ren, tex) != 0)		// set as target
 		throw Bad_Texture(__func__ + string(": SDL_SetRenderTarget failed!\nSDL Error: ") + SDL_GetError());
 }

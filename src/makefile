@@ -8,7 +8,7 @@ EXE = sdl_output
 
 all: $(EXE)
 
-$(EXE): main.o graphics.o
+$(EXE): graphics.o main.o
 	$(CXX) $^ $(LDFLAGS) -o $@
 
 main.o: main.cpp

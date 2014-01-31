@@ -198,6 +198,8 @@ public:
 	Color draw_color() const	{	return rcolor;		}
 	void draw_color(Color);		// set the current draw color (NOTE : draw_color is used for drawing operations only (line, rect, clear_screen)
 
+	void reset_render_target();	// reset render target to default
+
 private:
 	SDL_Renderer* ren;	// SDL's renderer
 	Color rcolor;		// the draw_color of renderer
@@ -212,7 +214,7 @@ public:
 		string what() const {	return "Bad_Texture: "+Exception::what();	}
 	};
 
-	Texture(SDL_Renderer*);		// initialize and set default values
+	Texture(Renderer& renderer);		// initialize and set default values
 
 	~Texture();	// calls free()
 
@@ -233,7 +235,7 @@ public:
 	void render(const Point pos, const SDL_Rect* clip = nullptr, double angle = 0.0, const Point* center = nullptr, SDL_RendererFlip = SDL_FLIP_NONE);
 
 	// set this texture as render target i.e. all the render() calls draw on this texture
-	void set_render_target();
+	void set_render_target(int width, int height);
 
 	// width, height getters
 	int width() const	{	return tw;	}
