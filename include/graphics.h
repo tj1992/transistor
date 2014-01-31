@@ -94,9 +94,17 @@ private:
 /*	Event_handler : An abstract event-handler class. All event-handlers must subclass it	*/
 class Event_handler {
 public:
+	Event_handler() : events(0)				{			}
+	Event_handler(Uint32 e) : events(e)			{			}
+
 	// handle the event passed (NOTE: keep the function small as it is called for every event received by Event_manager)
-	virtual void handle_event(const SDL_Event&) = 0;
-	virtual Uint32 event_type() const = 0;			// returns the event type the instance is interested in
+	virtual void handle_event(const SDL_Event&)		{			}
+
+	// returns the event type the instance is interested in	
+	Uint32 event_type() const			{	return events;	}	
+
+protected:
+	Uint32 events;
 };
 
 /*	Event_manager : wrapper for SDL_Event. Combined with 'Event_handler' provides a neat way of handling events	*/
@@ -106,18 +114,15 @@ public:
 
 	~Event_manager();
 
-	void add_handler(Event_handler&);
-	void remove_handler(Event_handler&);
+	void add_handler(Event_handler*);
+	void remove_handler(Event_handler*);
 
 	void poll_handle();
 	
-	//bool add_source();
-	typedef vector <Event_handler&>::iterator Handler_iterator;
-
 private:
 	SDL_Event event;
-	vector <Event_handler&> handlers;
-}
+	vector <Event_handler*> handlers;
+};
 
 /*	Window : wrapper for SDL_Window. Also an Event_handler	*/
 class Window : public Event_handler {
@@ -161,8 +166,6 @@ public:
 
 	void handle_event(const SDL_Event& event);	// event handler for window
 
-	// returns the interested events' types
-	Uint32 event_type() const	{	return SDL_WINDOWEVENT;				}
 private:
 	SDL_Window* win; // pointer to SDL_Window
 	string wtitle;	// title of 'Window' displayed by Window Manager

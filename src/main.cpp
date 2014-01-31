@@ -12,7 +12,7 @@ int main() {
 
 		Window win;
 		win.init();
-		eman.add(win);
+		eman.add_handler(&win);
 
 		win.pos(Point(0, 0));
 		win.resize(1000, 1000);
@@ -45,4 +45,3 @@ int main() {
 	SDL_Quit();
 	return 0;
 }
-

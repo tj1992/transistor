@@ -26,13 +26,13 @@ Event_manager::~Event_manager() {
 }
 
 //	Event_manager::add_handler : adds an handler for events
-void Event_manager::add_handler(Event_handler& handler) {
+void Event_manager::add_handler(Event_handler* handler) {
 	handlers.push_back(handler);		// add to handlers' list
 }
 
 //	Event_manager::remove_handler : remove the handler from list
-void Event_manager::remove_handler(Event_handler& handler) {
-	for (Handler_iterator iter = handlers.begin(); iter != handlers.end(); ++iter)	// iterate over the handlers' list
+void Event_manager::remove_handler(Event_handler* handler) {
+	for (vector<Event_handler*>::iterator iter = handlers.begin(); iter != handlers.end(); ++iter)	// iterate over the handlers' list
 		if (*iter == handler) {			// found matching handler?
 			handlers.erase(iter);		// remove it from the list
 			break;
@@ -41,10 +41,10 @@ void Event_manager::remove_handler(Event_handler& handler) {
 
 //	Event_manager::poll_handle: poll and handle events
 void Event_manager::poll_handle() {
-	while (SDL_PollEvent(&e)) {		// get an event
-		for (Handler_iterator iter = handlers.begin(); iter != handlers.end(); ++iter) {	// iterate over the handlers
-			if ((iter->event_type() & e.type)	// match the types
-				iter->handle_event(e);		// pass to handler
+	while (SDL_PollEvent(&event)) {		// get an event
+		for (vector<Event_handler*>::iterator iter = handlers.begin(); iter != handlers.end(); ++iter) {	// iterate over the handlers
+			if ((*iter)->event_type() & event.type)	// match the types
+				(*iter)->handle_event(event);		// pass to handler
 		}
 	}
 }
@@ -55,12 +55,15 @@ void Event_manager::poll_handle() {
 
 
 //	Window : default constructor for 'Window'. Just sets the different params to default values
-Window::Window() {
+Window::Window()
+	: Event_handler(SDL_WINDOWEVENT)
+{
 	*this = Window("Unnamed Window");
 }
 
 //	Window : sets the title to string 's'
 Window::Window(const string& s) :
+	Event_handler(SDL_WINDOWEVENT),
 	win(nullptr),
 	whidden(true),		// 'Window' is hidden
 	wquit(false)
