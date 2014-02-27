@@ -1,56 +1,31 @@
 #include "../include/graphics.h"
+#include "physics.cpp"
 #include <iostream>
 
 using namespace std;
+const int WIN_HEIGHT = 1000;
+const int WIN_WIDTH = 1000;
 
-class Ball : public Event_handler, public Texture {
+class Solid_Box : public Box, public Texture {
 public:
-	Ball(Renderer& renderer, int x, int y, int w, int h) : Event_handler(SDL_KEYDOWN | SDL_KEYUP), Texture(renderer), vx(0), vy(0)
+	Solid_Box(Renderer& renderer, int x, int y, int w, int h, Vec2 vel) : Box(Vec2(x, y), Vec2(x+w, y+h)), Texture(renderer)
 	{
-		r.x = x;
-		r.y = y;
-		r.w = 10;
-		r.h = 10;
-		set_render_target(r.w, r.h);
+		velocity = vel;
+		SDL_Rect r = { 0, 0, w, h };
+		set_render_target(w, h);
 		SDL_RenderFillRect(renderer.renderer(), &r);
 		renderer.reset_render_target();
-		r.w = w;
-		r.h = h;
-	}
-
-	void handle_event(const SDL_Event& e) {
-		if (e.key.repeat)
-			return;
-		if (e.type == SDL_KEYDOWN ) {
-			switch( e.key.keysym.sym ) {
-				case SDLK_UP: vy -= 5; break;
-				case SDLK_DOWN: vy += 5; break;
-				case SDLK_LEFT: vx -= 5; break;
-				case SDLK_RIGHT: vx += 5; break;
-			}
-		}
-		else if( e.type == SDL_KEYUP ) {
-			switch( e.key.keysym.sym ) {
-				case SDLK_UP: vy += 5; break;
-				case SDLK_DOWN: vy -= 5; break;
-				case SDLK_LEFT: vx += 5; break;
-				case SDLK_RIGHT: vx -= 5; break;
-			}
-        	}
 	}
 
 	void move() {
-		r.y = (r.y+vy) >= 0 ? (r.y+vy) % r.h : r.h;
-		r.x = (r.x+vx) >= 0 ? (r.x+vx) % r.w : r.w;
+		min += velocity;
+		max += velocity;
+		pos += velocity;
 	}
 
 	void render() {
-		Texture::render(Point(r.x, r.y));
+		Texture::render(Point(min.x, min.y));
 	}
-		
-private:
-	SDL_Rect r;
-	int vx, vy;
 };
 
 int main() {
@@ -65,33 +40,58 @@ int main() {
 		eman.add_handler(&win);
 
 		win.pos(Point(0, 0));
-		win.resize(1000, 1000);
+		win.resize(WIN_WIDTH, WIN_HEIGHT);
 
 		Renderer ren(win);
-
-		Texture tex(ren);
-		Texture tex2(ren);
-		Ball b(ren, 0, 0, 1000, 1000);
-		eman.add_handler(&b);
-
-		tex.load_from_file("../rsc/bk.png");
-		tex2.set_color_key(Color(0xFF, 0xFF, 0xFF, 0x00));
-		tex2.load_from_file("../rsc/tile.png");
-		tex2.set_blend_mode(SDL_BLENDMODE_BLEND);
-
+		
+		const int ITEM_SIZE = 54;
+		Solid_Box *item[ITEM_SIZE];
+		item[0] = new Solid_Box(ren, 0, 0, 10, 1000, Vec2(0,0));
+		item[1] = new Solid_Box(ren, 10, 0, 980, 10, Vec2(0,0));
+		item[2] = new Solid_Box(ren, 990, 0, 10, 1000, Vec2(0,0));
+		item[3] = new Solid_Box(ren, 10, 990, 980, 10, Vec2(0,0));
+		for (int i = 4; i < ITEM_SIZE; ++i) {
+			item[i] = new Solid_Box(ren, CLAMP(20, WIN_WIDTH-20, ((i-3)*20)%WIN_WIDTH), CLAMP(20, WIN_HEIGHT-20, (i-3)*50/WIN_WIDTH), 10, 10, Vec2(i%20-10, i%20-10));
+			item[i]->inv_mass = 0.9f;
+			item[i]->restitution = 0.9f;
+		}
+		const float fps = 60.0;
+		unsigned int frames = 0;
+		int delay = 0;
+		unsigned int timer;
+		unsigned int start_time = SDL_GetTicks();
 
 		while (!win.quit()) {
+			timer = SDL_GetTicks();
 			eman.poll_handle();
 
-			b.move();
+			for (int i = 4; i < ITEM_SIZE; ++i)
+				item[i]->move();
 
+			Manifold m;
+			for (int i = 4; i < ITEM_SIZE; ++i) {
+				m.a = item[i];
+				for (int j = 0; j < ITEM_SIZE; ++j) {
+					if (i == j)
+						continue;
+					m.b = item[j];
+					if (collision_box_box(m)) {	resolve_collision(m);	}
+				}
+			}
+			
 			ren.clear_screen();
-			tex.render(Point(0,0));
-			tex2.render(Point(10, 10));
-			b.render();
+			for (int i = 0; i < ITEM_SIZE; ++i)
+				item[i]->render();
 			ren.render_screen();
-		}
+			++frames;
+			timer = SDL_GetTicks() - timer;
+			if ((delay=1000/fps-timer) > 0) {
+				SDL_Delay(delay);
+			}
 
+		}
+		timer = SDL_GetTicks()-start_time;
+		cerr<<"Frames : "<<frames<<"\nTime Taken : "<<timer/1000.0f<<"\nFPS : "<<frames/(timer/1000.0f);
 	}
 	catch (Exception& e) {
 		cerr<<"Exception : "<<e.what()<<'\n';;
