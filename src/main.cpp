@@ -13,18 +13,14 @@ public:
 		velocity = vel;
 		SDL_Rect r = { 0, 0, w, h };
 		set_render_target(w, h);
+		if (vel.x != 0)
+			SDL_SetRenderDrawColor(renderer.renderer(), 255, 0, 0, 0);
 		SDL_RenderFillRect(renderer.renderer(), &r);
 		renderer.reset_render_target();
 	}
 
-	void move() {
-		min += velocity;
-		max += velocity;
-		pos += velocity;
-	}
-
 	void render() {
-		Texture::render(Point(min.x, min.y));
+		Texture::render(Point(pos.x-width()/2, pos.y-height()/2));
 	}
 };
 
@@ -44,16 +40,19 @@ int main() {
 
 		Renderer ren(win);
 		
-		const int ITEM_SIZE = 54;
+		const int ITEM_SIZE = 506;
+		const int SIZE = 15;
+		const int SPEED = 10;
+
 		Solid_Box *item[ITEM_SIZE];
 		item[0] = new Solid_Box(ren, 0, 0, 10, 1000, Vec2(0,0));
 		item[1] = new Solid_Box(ren, 10, 0, 980, 10, Vec2(0,0));
 		item[2] = new Solid_Box(ren, 990, 0, 10, 1000, Vec2(0,0));
 		item[3] = new Solid_Box(ren, 10, 990, 980, 10, Vec2(0,0));
 		for (int i = 4; i < ITEM_SIZE; ++i) {
-			item[i] = new Solid_Box(ren, CLAMP(20, WIN_WIDTH-20, ((i-3)*20)%WIN_WIDTH), CLAMP(20, WIN_HEIGHT-20, (i-3)*50/WIN_WIDTH), 10, 10, Vec2(i%20-10, i%20-10));
+			item[i] = new Solid_Box(ren, CLAMP(20, WIN_WIDTH-20, ((i-3)*(SIZE+5))%WIN_WIDTH), CLAMP(20, WIN_HEIGHT-20, (i-3)*(SIZE+5)/WIN_WIDTH), SIZE, SIZE, Vec2(i%SPEED-SPEED/2, i%SPEED-SPEED/2));
 			item[i]->inv_mass = 0.9f;
-			item[i]->restitution = 0.9f;
+			item[i]->restitution = 1.0f;
 		}
 		const float fps = 60.0;
 		unsigned int frames = 0;
@@ -61,6 +60,7 @@ int main() {
 		unsigned int timer;
 		unsigned int start_time = SDL_GetTicks();
 
+		SDL_SetRenderDrawColor(ren.renderer(), 0, 0, 0, 0);
 		while (!win.quit()) {
 			timer = SDL_GetTicks();
 			eman.poll_handle();
@@ -75,7 +75,7 @@ int main() {
 					if (i == j)
 						continue;
 					m.b = item[j];
-					if (collision_box_box(m)) {	resolve_collision(m);	}
+					if (collision_box_box(m)) {	resolve_collision(m); positional_correction(m);	}
 				}
 			}
 			
@@ -91,7 +91,10 @@ int main() {
 
 		}
 		timer = SDL_GetTicks()-start_time;
-		cerr<<"Frames : "<<frames<<"\nTime Taken : "<<timer/1000.0f<<"\nFPS : "<<frames/(timer/1000.0f);
+		cerr<<"Frames : "<<frames<<"\nTime Taken : "<<timer/1000.0f<<"\nFPS : "<<frames/(timer/1000.0f)<<'\n';
+
+		//for (int i = 0; i < ITEM_SIZE; ++i)
+		//	cerr<<"vel-x : "<<item[i]->velocity.x<<" vel-y : "<<item[i]->velocity.y<<'\n';
 	}
 	catch (Exception& e) {
 		cerr<<"Exception : "<<e.what()<<'\n';;

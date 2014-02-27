@@ -83,6 +83,9 @@ struct Bounding_Circle {
 
 	Bounding_Circle() : cpos(), rad(0.0f)
 	{	}
+
+	Bounding_Circle(Vec2 centre, float radius) : cpos(centre), rad(radius)
+	{	}
 };
 
 struct Object {
@@ -93,10 +96,23 @@ struct Object {
 
 	Object() : pos(), velocity(), inv_mass(0.0), restitution(1.0)
 	{	}
+
+	virtual void move() {
+		pos += velocity;
+	}
 };
 
 struct Circle : public Object, Bounding_Circle {
 // keep cpos and pos equal
+	Circle(Vec2 position, float radius) : Object(), Bounding_Circle(position, radius)
+	{
+		pos = position;
+	}
+
+	virtual void move() {
+		pos += velocity;
+		cpos = pos;
+	}
 };
 
 struct Box : public Object, Bounding_Box {
@@ -107,6 +123,15 @@ struct Box : public Object, Bounding_Box {
 	Box(Vec2 m1, Vec2 m2) : Object(), Bounding_Box(m1, m2)
 	{
 		pos = Vec2((min.x+max.x)/2, (min.y+max.y)/2);
+	}
+
+	virtual void move() {
+		const register float ex = (max.x-min.x)/2;
+		const register float ey = (max.y-min.y)/2;
+
+		pos += velocity;
+		min = Vec2(pos.x-ex, pos.y-ey);
+		max = Vec2(pos.x+ex, pos.y+ey);
 	}
 };
 
@@ -246,19 +271,27 @@ bool collision_box_circle(Manifold& m) {
 }
 
 void resolve_collision(Manifold& m) {
-	Vec2 rv = m.b->velocity - m.a->velocity;
+	Vec2 rv = m.b->velocity - m.a->velocity;	// the relative velocity vector
 
-	float rv_normal = dot_product(rv, m.normal);
-
+	register float rv_normal = dot_product(rv, m.normal);	// calculate the magnitude of relative velocity along the collision normal
 	if (rv_normal > 0)
-		return;
+		return;		// doesn't need resolution as both objects are moving in same direction and will get resolved after next step
 
-	float sum_inv_mass = m.a->inv_mass + m.b->inv_mass;
-	Vec2 impulse = m.normal * (-(1+MIN(m.a->restitution, m.b->restitution)) * rv_normal / sum_inv_mass);
+	register float sum_inv_mass = m.a->inv_mass + m.b->inv_mass;
+	Vec2 impulse = m.normal * (-(1 + MIN(m.a->restitution, m.b->restitution)) * rv_normal / sum_inv_mass);
 /*
 	m.a->velocity -= impulse * m.b->inv_mass / sum_inv_mass;
 	m.b->velocity += impulse * m.a->inv_mass / sum_inv_mass;
 */
 	m.a->velocity -= impulse * m.a->inv_mass;
 	m.b->velocity += impulse * m.b->inv_mass;
+}
+
+void positional_correction(Manifold& m)
+{
+	const float ratio = 0.9;
+	const float slop = 0.01;
+	Vec2 correction = m.normal * MAX(m.penetration - slop, 0.0f ) / (m.a->inv_mass + m.b->inv_mass) * ratio;
+	m.a->pos -= correction * m.a->inv_mass;
+	m.b->pos += correction * m.b->inv_mass;
 }
