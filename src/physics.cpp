@@ -97,8 +97,8 @@ struct Object {
 	Object() : pos(), velocity(), inv_mass(0.0), restitution(1.0)
 	{	}
 
-	virtual void move() {
-		pos += velocity;
+	virtual void move(float dt) {
+		pos += velocity * dt;
 	}
 };
 
@@ -109,8 +109,8 @@ struct Circle : public Object, Bounding_Circle {
 		pos = position;
 	}
 
-	virtual void move() {
-		pos += velocity;
+	virtual void move(float dt) {
+		pos += velocity * dt;
 		cpos = pos;
 	}
 };
@@ -125,11 +125,11 @@ struct Box : public Object, Bounding_Box {
 		pos = Vec2((min.x+max.x)/2, (min.y+max.y)/2);
 	}
 
-	virtual void move() {
+	virtual void move(float dt) {
 		const register float ex = (max.x-min.x)/2;
 		const register float ey = (max.y-min.y)/2;
 
-		pos += velocity;
+		pos += velocity * dt;
 		min = Vec2(pos.x-ex, pos.y-ey);
 		max = Vec2(pos.x+ex, pos.y+ey);
 	}
@@ -295,3 +295,5 @@ void positional_correction(Manifold& m)
 	m.a->pos -= correction * m.a->inv_mass;
 	m.b->pos += correction * m.b->inv_mass;
 }
+
+

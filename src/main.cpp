@@ -40,9 +40,9 @@ int main() {
 
 		Renderer ren(win);
 		
-		const int ITEM_SIZE = 506;
+		const int ITEM_SIZE = 106;
 		const int SIZE = 15;
-		const int SPEED = 10;
+		const int SPEED = 70;
 
 		Solid_Box *item[ITEM_SIZE];
 		item[0] = new Solid_Box(ren, 0, 0, 10, 1000, Vec2(0,0));
@@ -50,51 +50,72 @@ int main() {
 		item[2] = new Solid_Box(ren, 990, 0, 10, 1000, Vec2(0,0));
 		item[3] = new Solid_Box(ren, 10, 990, 980, 10, Vec2(0,0));
 		for (int i = 4; i < ITEM_SIZE; ++i) {
-			item[i] = new Solid_Box(ren, CLAMP(20, WIN_WIDTH-20, ((i-3)*(SIZE+5))%WIN_WIDTH), CLAMP(20, WIN_HEIGHT-20, (i-3)*(SIZE+5)/WIN_WIDTH), SIZE, SIZE, Vec2(i%SPEED-SPEED/2, i%SPEED-SPEED/2));
+			item[i] = new Solid_Box(ren, CLAMP(20, WIN_WIDTH-20, ((i-3)*(2*SIZE))%WIN_WIDTH), CLAMP(20, WIN_HEIGHT-20, (i-3)*(2*SIZE)/WIN_WIDTH), SIZE, SIZE, Vec2(i%SPEED-SPEED/2, i%SPEED-SPEED/2));
 			item[i]->inv_mass = 0.9f;
 			item[i]->restitution = 1.0f;
 		}
-		const float fps = 60.0;
 		unsigned int frames = 0;
-		int delay = 0;
+
+		const float fps = 60.0;
+		const float dt = 1/fps;
+		float accumulator = 0;
+
 		unsigned int timer;
 		unsigned int start_time = SDL_GetTicks();
+
+		float frame_start = SDL_GetTicks();
 
 		SDL_SetRenderDrawColor(ren.renderer(), 0, 0, 0, 0);
 		while (!win.quit()) {
 			timer = SDL_GetTicks();
 			eman.poll_handle();
 
-			for (int i = 4; i < ITEM_SIZE; ++i)
-				item[i]->move();
+			accumulator += timer - frame_start;
+			frame_start = timer;
 
-			Manifold m;
-			for (int i = 4; i < ITEM_SIZE; ++i) {
-				m.a = item[i];
-				for (int j = 0; j < ITEM_SIZE; ++j) {
-					if (i == j)
-						continue;
-					m.b = item[j];
-					if (collision_box_box(m)) {	resolve_collision(m); positional_correction(m);	}
+			if (accumulator > 0.2f)
+				accumulator = 0.2f;
+			while (accumulator > dt) {
+				// update physics
+				for (int i = 4; i < ITEM_SIZE; ++i)
+					item[i]->move(dt);
+
+				Manifold m;
+				for (int i = 4; i < ITEM_SIZE; ++i) {
+					m.a = item[i];
+					for (int j = 0; j < ITEM_SIZE; ++j) {
+						if (i == j)
+							continue;
+						m.b = item[j];
+						if (collision_box_box(m)) {	resolve_collision(m); positional_correction(m);	}
+					}
 				}
+
+				accumulator -= dt;
 			}
 			
+			// render
 			ren.clear_screen();
 			for (int i = 0; i < ITEM_SIZE; ++i)
 				item[i]->render();
 			ren.render_screen();
+
+			// stats
+			/*
 			++frames;
 			timer = SDL_GetTicks() - timer;
-			if ((delay=1000/fps-timer) > 0) {
-				SDL_Delay(delay);
-			}
+			cerr<<1000.0f/float(timer)<<'\n';	// print current fps
+			*/
 
 		}
+		/*
 		timer = SDL_GetTicks()-start_time;
-		cerr<<"Frames : "<<frames<<"\nTime Taken : "<<timer/1000.0f<<"\nFPS : "<<frames/(timer/1000.0f)<<'\n';
-
-		//for (int i = 0; i < ITEM_SIZE; ++i)
-		//	cerr<<"vel-x : "<<item[i]->velocity.x<<" vel-y : "<<item[i]->velocity.y<<'\n';
+		cout<<"Frames : "<<frames<<"\nTime Taken : "<<timer/1000.0f<<"\nFPS : "<<frames/(timer/1000.0f)<<'\n';
+		*/
+		/*
+		for (int i = 0; i < ITEM_SIZE; ++i)
+			cerr<<"vel-x : "<<item[i]->velocity.x<<" vel-y : "<<item[i]->velocity.y<<'\n';
+		*/
 	}
 	catch (Exception& e) {
 		cerr<<"Exception : "<<e.what()<<'\n';;
