@@ -8,19 +8,23 @@ EXE = sdl_output
 all: $(EXE)
 
 debug: CXXFLAGS += -g
+debug: clean
 debug: $(EXE)
 
-$(EXE): graphics.o main.o
+$(EXE): common.o graphics.o physics.o main.o
 	$(CXX) $^ $(LDFLAGS) -o $@
 
 main.o: main.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
+physics.o : physics.cpp ../include/physics.h
+	$(CXX) $(CXXFLAGS) $< -o $@
+
 graphics.o: graphics.cpp ../include/graphics.h
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-physics.o : physics.cpp
-	$(CXX) $(CXXFLAGS) -c $<
+common.o : common.cpp ../include/common.h
+	$(CXX) $(CXXFLAGS) $< -o $@
 
 clean:
 	rm *.o && rm $(EXE)

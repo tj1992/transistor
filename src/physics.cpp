@@ -1,163 +1,53 @@
-#include <cmath>
+#include "../include/physics.h"
 
-using namespace std;
+//	Initialize the ID generator counter to 0
+ID ID_gen::next_ID = 0;
 
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+void Manifold::resolve_collision () {
+	Vec2 rv = b->velocity - a->velocity;	// the relative velocity vector
 
-#define CLAMP(a, b, x) MIN(MAX((a), (x)), (b))
+	register float rv_normal = dot_product (rv, normal);	// calculate the magnitude of relative velocity along the collision normal
+	if (rv_normal > 0)
+		return;		// doesn't need resolution as both objects are moving in same direction and will get resolved after next step
 
-struct Vec2 {
-	float x, y;
-
-	Vec2() : x(0.0f), y(0.0f)
-	{	}
-
-	Vec2(float i, float j) : x(i), y(j)
-	{	}
-
-	float magnitude() const {
-		return sqrt(x*x + y*y);
-	}
-};
-
-Vec2 operator -(const Vec2& a, const Vec2& b) {
-	return Vec2(a.x - b.x, a.y - b.y);
+	register float sum_inv_mass = a->inv_mass + b->inv_mass;
+	Vec2 impulse = normal * (-(1 + MIN (a->restitution, b->restitution)) * rv_normal / sum_inv_mass);
+/*
+	m.a->velocity -= impulse * m.b->inv_mass / sum_inv_mass;
+	m.b->velocity += impulse * m.a->inv_mass / sum_inv_mass;
+*/
+	a->velocity -= impulse * a->inv_mass;
+	b->velocity += impulse * b->inv_mass;
 }
 
-Vec2 operator -(const Vec2& a, float c) {
-	return Vec2(a.x - c, a.y - c);
+void Manifold::positional_correction () {
+	const float ratio = 0.9;
+	const float slop = 0.01;
+	Vec2 correction = normal * MAX (penetration - slop, 0.0f ) / (a->inv_mass + b->inv_mass) * ratio;
+	a->pos -= correction * a->inv_mass;
+	b->pos += correction * b->inv_mass;
 }
 
-Vec2 operator -(const Vec2& a) {
-	return Vec2(-a.x, -a.y);
+void Body::integrate_forces (float dt) {
+	velocity += (force * inv_mass + GRAVITY_ACCELERATION * gravity_scale) * (dt / 2.0f);
 }
 
-Vec2 operator -=(Vec2& a, const Vec2& b) {
-	return a = a-b;
+void Body::integrate_velocity (float dt) {
+	pos += velocity * dt;
+	shape->move();
+	integrate_forces(dt);
 }
 
-Vec2 operator +(const Vec2& a, const Vec2& b) {
-	return Vec2(a.x + b.x, a.y + b.y);
-}
-
-Vec2 operator +(const Vec2& a, float c) {
-	return Vec2(a.x + c, a.y + c);
-}
-
-Vec2 operator += (Vec2& a, const Vec2& b) {
-	return a = a+b;
-}
-
-Vec2 operator *(const Vec2& a, float f) {
-	return Vec2(a.x * f, a.y * f);
-}
-
-Vec2 operator /(const Vec2& a, float f) {
-	return Vec2(a.x / f, a.y / f);
-}
-
-bool operator ==(const Vec2& a, const Vec2& b) {
-	return a.x == b.x && a.y == b.y;
-}
-
-float dot_product(const Vec2& a, const Vec2& b) {
-	return (a.x * b.x + a.y * b.y);
-}
-
-
-struct Bounding_Box {
-	Vec2 min;	// top left corner
-	Vec2 max;	// bottom right corner
-
-	Bounding_Box() : min(), max()
-	{	}
-
-	Bounding_Box(Vec2 m1, Vec2 m2) : min(m1), max(m2)
-	{	}
-};
-
-struct Bounding_Circle {
-	Vec2 cpos;	// position of centre
-	float rad;	// radius
-
-	Bounding_Circle() : cpos(), rad(0.0f)
-	{	}
-
-	Bounding_Circle(Vec2 centre, float radius) : cpos(centre), rad(radius)
-	{	}
-};
-
-struct Object {
-	Vec2 pos;
-	Vec2 velocity;
-	float inv_mass;
-	float restitution;
-
-	Object() : pos(), velocity(), inv_mass(0.0), restitution(1.0)
-	{	}
-
-	virtual void move(float dt) {
-		pos += velocity * dt;
-	}
-};
-
-struct Circle : public Object, Bounding_Circle {
-// keep cpos and pos equal
-	Circle(Vec2 position, float radius) : Object(), Bounding_Circle(position, radius)
-	{
-		pos = position;
-	}
-
-	virtual void move(float dt) {
-		pos += velocity * dt;
-		cpos = pos;
-	}
-};
-
-struct Box : public Object, Bounding_Box {
-// pos equals the centre point of the Bounding_Box i.e. (min.x+max.x)/2, (min.y+max.y)/2
-	Box()
-	{	}
-
-	Box(Vec2 m1, Vec2 m2) : Object(), Bounding_Box(m1, m2)
-	{
-		pos = Vec2((min.x+max.x)/2, (min.y+max.y)/2);
-	}
-
-	virtual void move(float dt) {
-		const register float ex = (max.x-min.x)/2;
-		const register float ey = (max.y-min.y)/2;
-
-		pos += velocity * dt;
-		min = Vec2(pos.x-ex, pos.y-ey);
-		max = Vec2(pos.x+ex, pos.y+ey);
-	}
-};
-
-struct Manifold {
-	Object* a;
-	Object* b;
-	float penetration;
-	Vec2 normal;
-
-	Manifold() : a(nullptr), b(nullptr), penetration(0.0f), normal()
-	{	}
-
-	Manifold(Object* obja, Object* objb): a(obja), b(objb), penetration(0.0f), normal()
-	{	}
-};
-
-bool collsion_circle_circle(Manifold& m) {
-	Circle* a = (Circle*)m.a;
-	Circle* b = (Circle*)m.b;
+bool collision_circle_circle(Manifold& m) {
+	float ra = ((Bounding_Circle*)m.a->shape)->rad;
+	float rb = ((Bounding_Circle*)m.b->shape)->rad;
 
 	// get the normal
-	Vec2 n = b->pos - a->pos;
-	float r = a->rad + b->rad;
+	Vec2 n = m.b->pos - m.a->pos;
+	float r = ra + rb;
 
 	// check collision
-	if (dot_product(n, n) > r*r)
+	if (dot_product(n, n) >= r*r)
 		return false;
 
 	float d = n.magnitude();
@@ -168,47 +58,47 @@ bool collsion_circle_circle(Manifold& m) {
 		return true;
 	}
 	else {	// concentric circles
-		m.penetration = MIN(a->rad, b->rad);
-		m.normal = Vec2(1.0f, 0.0f);
+		m.penetration = MIN(ra, rb);
+		m.normal.set(1.0f, 0.0f);
 
 		return true;
 	}
 }
 
 bool collision_box_box(Manifold& m) {
-	Box* a = (Box*)(m.a);
-	Box* b = (Box*)(m.b);
+	Bounding_Box* ba = (Bounding_Box*)(m.a->shape);
+	Bounding_Box* bb = (Bounding_Box*)(m.b->shape);
 
 	// get the normal
-	Vec2 n = b->pos - a->pos;
+	Vec2 n = m.b->pos - m.a->pos;
 
 	// side lengths
-	float a_extent = (a->max.x - a->min.x) / 2;
-	float b_extent = (b->max.x - b->min.x) / 2;
+	float a_extent = (ba->max.x - ba->min.x) / 2;
+	float b_extent = (bb->max.x - bb->min.x) / 2;
 
 	// get the overlap length
 	float x_overlap = a_extent + b_extent - abs(n.x);
 	if (x_overlap > 0) {		// overlapping in x direction
 		// get the y-extents
-		a_extent = (a->max.y - a->min.y) / 2;
-		b_extent = (b->max.y - b->min.y) / 2;
+		a_extent = (ba->max.y - ba->min.y) / 2;
+		b_extent = (bb->max.y - bb->min.y) / 2;
 
 		float y_overlap = a_extent + b_extent - abs(n.y);
 		if (y_overlap > 0) {	// overlapping in both axes
 			if (x_overlap < y_overlap) {
 				if (n.x < 0)
-					m.normal = Vec2(-1.0f, 0.0f);
+					m.normal.set(-1.0f, 0.0f);
 				else
-					m.normal = Vec2(1.0f, 0.0f);
+					m.normal.set(1.0f, 0.0f);
 				m.penetration = x_overlap;
 
 				return true;
 			}
 			else {
 				if (n.y < 0)
-					m.normal = Vec2(0.0f, -1.0f);
+					m.normal.set(0.0f, -1.0f);
 				else
-					m.normal = Vec2(0.0f, 1.0f);
+					m.normal.set(0.0f, 1.0f);
 				m.penetration = y_overlap;
 
 				return true;
@@ -219,21 +109,21 @@ bool collision_box_box(Manifold& m) {
 }
 
 bool collision_box_circle(Manifold& m) {
-	Box* a = (Box*)m.a;
-	Circle* b = (Circle*)m.b;
+	Bounding_Box* ba = (Bounding_Box*)m.a->shape;
+	float r = ((Bounding_Circle*)m.b->shape)->rad;
 
 	// get the direction vector
-	Vec2 n = b->pos - a->pos;
+	Vec2 n = m.b->pos - m.a->pos;
 	// set the closest point b/w circle to box distance b/w centres for now
 	Vec2 closest = n;
 
 	// extents of box (refers to box when centered to origin)
-	float x_extent = (a->max.x - a->min.x)/2;
-	float y_extent = (a->max.y - a->min.y)/2;
+	float x_extent = (ba->max.x - ba->min.x)/2;
+	float y_extent = (ba->max.y - ba->min.y)/2;
 
 	// clamp the closest point to within the box extents
-	closest.x = CLAMP(-x_extent, x_extent, closest.x);
-	closest.y = CLAMP(-y_extent, y_extent, closest.y);
+	closest.x = CLAMP (-x_extent, x_extent, closest.x);
+	closest.y = CLAMP (-y_extent, y_extent, closest.y);
 
 	bool inside = false;
 
@@ -250,7 +140,6 @@ bool collision_box_circle(Manifold& m) {
 
 	Vec2 normal = n - closest;
 	float d = dot_product(normal, normal);
-	float r = b->rad;
 
 	if (d > r*r && !inside)
 		return false;
@@ -258,42 +147,52 @@ bool collision_box_circle(Manifold& m) {
 	d = sqrt(d);
 
 	if (inside) {
-		m.normal = -n;
+		m.normal = -normal / d;
 		m.penetration = r+d;
 	}
 
 	else {
-		m.normal = n;
+		m.normal = normal / d;
 		m.penetration = r-d;
 	}
 
 	return true;
 }
 
-void resolve_collision(Manifold& m) {
-	Vec2 rv = m.b->velocity - m.a->velocity;	// the relative velocity vector
-
-	register float rv_normal = dot_product(rv, m.normal);	// calculate the magnitude of relative velocity along the collision normal
-	if (rv_normal > 0)
-		return;		// doesn't need resolution as both objects are moving in same direction and will get resolved after next step
-
-	register float sum_inv_mass = m.a->inv_mass + m.b->inv_mass;
-	Vec2 impulse = m.normal * (-(1 + MIN(m.a->restitution, m.b->restitution)) * rv_normal / sum_inv_mass);
-/*
-	m.a->velocity -= impulse * m.b->inv_mass / sum_inv_mass;
-	m.b->velocity += impulse * m.a->inv_mass / sum_inv_mass;
-*/
-	m.a->velocity -= impulse * m.a->inv_mass;
-	m.b->velocity += impulse * m.b->inv_mass;
+bool collision_circle_box(Manifold& m) {
+	Body* temp = m.a;
+	m.a = m.b;
+	m.b = temp;
+	return collision_box_circle(m);
 }
 
-void positional_correction(Manifold& m)
-{
-	const float ratio = 0.9;
-	const float slop = 0.01;
-	Vec2 correction = m.normal * MAX(m.penetration - slop, 0.0f ) / (m.a->inv_mass + m.b->inv_mass) * ratio;
-	m.a->pos -= correction * m.a->inv_mass;
-	m.b->pos += correction * m.b->inv_mass;
+bool (*collision_callback[Shape::Type::SIZE][Shape::Type::SIZE])(Manifold&) = {
+	collision_box_box,
+	collision_box_circle,
+	collision_circle_box,
+	collision_circle_circle
+};
+
+void Scene::step (float dt) {
+	Body_iterator iter;
+	Body_iterator iter2;
+	Manifold m;
+
+	for (iter = bodies.begin(); iter != bodies.end(); ++iter) {
+		iter->second->integrate_forces(dt);
+		iter->second->integrate_velocity(dt);
+		iter->second->force.set(0.0f, 0.0f);
+	}
+
+	for (iter = bodies.begin(); iter != bodies.end(); ++iter)
+		for (iter2 = iter, ++iter2; iter2 != bodies.end(); ++iter2) {
+			if (!(iter->second->shape->layer & iter2->second->shape->layer))
+				continue;
+			m.a = iter->second;
+			m.b = iter2->second;
+			if ((*collision_callback [iter->second->shape->type][iter2->second->shape->type])(m)) {
+				m.resolve_collision();
+				m.positional_correction();
+			}
+		}
 }
-
-

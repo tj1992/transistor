@@ -103,8 +103,8 @@ void Window::free() {
 
 //	Window::pos : set the Window position to Point p (global coordinates are used)
 void Window::pos(Point p) {
-	wrect.x = p.x() >= 0 ? p.x() : SDL_WINDOWPOS_CENTERED;	// set to CENTERED if -ve
-	wrect.y = p.y() >= 0 ? p.y() : SDL_WINDOWPOS_CENTERED;
+	wrect.x = p.x >= 0 ? p.x : SDL_WINDOWPOS_CENTERED;	// set to CENTERED if -ve
+	wrect.y = p.y >= 0 ? p.y : SDL_WINDOWPOS_CENTERED;
 
 	SDL_SetWindowPosition(win, wrect.x, wrect.y);	// update position
 }
@@ -138,23 +138,21 @@ void Window::handle_event(const SDL_Event& event) {
 //	class Renderer
 //////////////////////////////////////////////////////////////////////
 
+//	Initialization of static data members
+SDL_Renderer* Renderer::ren = nullptr;
+Color Renderer::rcolor = Color::BLACK;
+
 //	Renderer : create the SDL_Renderer
-Renderer::Renderer(Window& win) :
-	rcolor(Color())
+void Renderer::create_renderer(Window& win)
 {
 	ren = SDL_CreateRenderer(win.window(), -1, RENDERER_FLAGS);	// -1 for specifying default rendering driver
 	if (ren == nullptr)
-		throw Bad_Renderer(__func__ + string(": SDL_CreateRenderer failed.\nSDL Error: ") + SDL_GetError());
+		throw Exception(__func__ + string(": SDL_CreateRenderer failed.\nSDL Error: ") + SDL_GetError());
 
 	if (SDL_GetRenderDrawColor(ren, &rcolor.color()->r, &rcolor.color()->g, &rcolor.color()->b, &rcolor.color()->a) != 0) {
 		cerr<<"WARNING: "<<__func__<<": SDL_GetRenderDrawColor failed!\nSDL Error: "<<SDL_GetError()<<'\n';
 		rcolor = Color::BLACK;
 	}
-}
-
-//	~Renderer : delete the SDL_Renderer
-Renderer::~Renderer() {
-	free();
 }
 
 //	Renderer::free : destroy the SDL_Renderer
@@ -174,8 +172,8 @@ void Renderer::clear_screen() {
 	SDL_RenderClear(ren);
 }
 
-//	Renderer::draw_color : set the current draw color for renderer
-void Renderer::draw_color(Color c) {
+//	Renderer::set_draw_color : set the current draw color for renderer
+void Renderer::set_draw_color(Color c) {
 	if (SDL_SetRenderDrawColor(ren, c.red(), c.green(), c.blue(), c.alpha()) != 0) {		// Set the draw color
 		cerr<<"WARNING: "<<__func__<<": SDL_SetRenderDrawColor failed!\nSDL Error: "<<SDL_GetError()<<'\n';	// rcolor unchanged!
 	}
@@ -186,8 +184,13 @@ void Renderer::draw_color(Color c) {
 
 //	Renderer::reset_render_target : reset the render target
 void Renderer::reset_render_target() {
-	if (SDL_SetRenderTarget(ren, nullptr) != 0) {
-		throw Bad_Renderer(__func__ + string(": SDL_SetRenderTarget failed!\nSDL Error: ") + SDL_GetError());
+	Renderer::set_render_target(nullptr);
+}
+
+//	Renderer::set_render_target : set the current render target to 'tex'
+void Renderer::set_render_target(SDL_Texture* tex) {
+	if (SDL_SetRenderTarget(ren, tex) != 0) {
+		throw Exception(__func__ + string(": SDL_SetRenderTarget failed!\nSDL Error: ") + SDL_GetError());
 	}
 }
 
@@ -196,13 +199,12 @@ void Renderer::reset_render_target() {
 //////////////////////////////////////////////////////////////////////
 
 //	Texture : sets the defaults
-Texture::Texture(Renderer& renderer) :
+Texture::Texture() :
 	tex(nullptr),
 	color_key(Color::BLACK),
 	tw(0),
 	th(0)
 {
-	ren = renderer.renderer();
 }
 
 //	~Texture : delete the Texture
@@ -222,7 +224,7 @@ void Texture::free() {
 
 //	Texture::create_blank : create a blank texture
 void Texture::create_blank(int w, int h, SDL_TextureAccess access) {
-	tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGBA8888, access, w, h);	// create the texture
+	tex = SDL_CreateTexture(Renderer::renderer(), SDL_PIXELFORMAT_RGBA8888, access, w, h);	// create the texture
 	if (tex == nullptr) {
 		throw Bad_Texture(__func__ + string(": SDL_CreateTexture failed!\nSDL Error: ") + SDL_GetError());
 	}
@@ -244,7 +246,7 @@ void Texture::load_from_file(string path) {
 	
 	SDL_SetColorKey(surf, SDL_TRUE, SDL_MapRGB(surf->format, color_key.red(), color_key.green(), color_key.blue()));	// set the color key for surface
 
-	ntex = SDL_CreateTextureFromSurface(ren, surf);		//convert the surface to texture
+	ntex = SDL_CreateTextureFromSurface(Renderer::renderer(), surf);		//convert the surface to texture
 	if (ntex == nullptr) {
 		throw Bad_Texture(__func__ + string(": unable to convert surface to texture!\nSDL Error: ") + SDL_GetError());
 	}
@@ -275,26 +277,22 @@ void Texture::set_alpha(Uint8 alpha) {
 
 //	Texture::render : render the texture
 void Texture::render(const Point p, const SDL_Rect* clip, double angle, const Point* center, SDL_RendererFlip flip) {
-	SDL_Rect ren_quad = { p.x(), p.y(), tw, th };		// the render quad of the texture (position in the current renderer's coordinates)
+	SDL_Rect ren_quad = { p.x, p.y, tw, th };		// the render quad of the texture (position in the current renderer's coordinates)
+	SDL_Point* cen = nullptr;
+	if (center != nullptr)
+		cen = new SDL_Point { center->point().x, center->point().y };
 
 	if (clip != nullptr) {
 		ren_quad.w = clip->w;	// clip the Texure
 		ren_quad.h = clip->h;
 	}
 
-	if (SDL_RenderCopyEx(ren, tex, clip, &ren_quad, angle, &center->point, flip) != 0) {		//	clip provides source clipping while ren_quad provide destination clipping
+	if (SDL_RenderCopyEx(Renderer::renderer(), tex, clip, &ren_quad, angle, cen, flip) != 0) {		//	clip provides source clipping while ren_quad provide destination clipping
 		throw Bad_Texture(__func__ + string(": SDL_RenderCopyEx failed\nSDL error: ") + SDL_GetError());
 	}
-}
-
-//	Texture::set_render_target : set the texture as rendering target
-void Texture::set_render_target(int w, int h) {
-	free();
 	
-	create_blank(w, h, SDL_TEXTUREACCESS_TARGET);
-
-	if (SDL_SetRenderTarget(ren, tex) != 0)		// set as target
-		throw Bad_Texture(__func__ + string(": SDL_SetRenderTarget failed!\nSDL Error: ") + SDL_GetError());
+	if (center != nullptr)
+		delete cen;
 }
 
 //	init : initializes the SDL systems

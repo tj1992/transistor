@@ -1,10 +1,7 @@
 #ifndef TRANS_GRAPHICS_HEAD
 #define TRANS_GRAPHICS_HEAD
 
-#include <iostream>	// for error reporting to 'cerr'
-#include <string>	// for std::string
-#include <vector>	// for std::vector
-
+#include "common.h"
 #include <SDL.h>
 #include <SDL_image.h>
 
@@ -17,28 +14,6 @@ const int WINDOW_FLAGS = SDL_WINDOW_SHOWN;	// used by SDL_CreateWindow
 const int RENDERER_FLAGS = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE;	// used by SDL_CreateRenderer
 const int INIT_FLAGS = SDL_INIT_VIDEO;		// used by SDL_Init
 const int IMG_FLAGS = IMG_INIT_PNG | IMG_INIT_JPG;	//used by IMG_Init
-
-/*	Point : wrapper for SDL_Point	*/
-struct Point {
-	Point() {
-		point.x = 0;
-		point.y = 0;
-	}
-	Point(int x, int y) {
-		point.x = x;
-		point.y = y;
-	}
-
-	int x() const {
-		return point.x;
-	}
-
-	int y() const {
-		return point.y;
-	}
-
-	SDL_Point point;	// SDL_Point { int x, int y };
-};
 
 /*	Exception : Base class of all the exceptions	*/
 class Exception {
@@ -175,34 +150,25 @@ private:
 };
 
 /*	Renderer : wrapper for SDL_Renderer	*/
-class Renderer {
-public:
-	class Bad_Renderer : public Exception {	// prefixes 'what()' with "Bad_Renderer: "
-	public:
-		Bad_Renderer(string m) : Exception(m) {	}
-		string what() const {	return "Bad_Renderer: "+Exception::what();	}
-	};
-	
-	Renderer(Window& win);	// SDL_CreateRenderer is called for creating Renderer for 'Window'
-	
-	~Renderer();	// calls 'free()'
+struct Renderer {
+	static void create_renderer(Window&);
 
-	void free();	// deletes the 'SDL_Renderer'
+	static void free();	// deletes the 'SDL_Renderer'
 
-	SDL_Renderer* renderer()	{	return ren;	}
+	static SDL_Renderer* renderer()	{	return ren;	}
 
-	void render_screen();	// draw the scene to screen
-	void clear_screen();	// clear screen with current color
+	static void render_screen();	// draw the scene to screen
+	static void clear_screen();	// clear screen with current color
 	
 	// get the current draw color
-	Color draw_color() const	{	return rcolor;		}
-	void draw_color(Color);		// set the current draw color (NOTE : draw_color is used for drawing operations only (line, rect, clear_screen)
+	static Color get_draw_color() {	return rcolor;		}
+	static void set_draw_color(Color);		// set the current draw color (NOTE : draw_color is used for drawing operations only (line, rect, clear_screen)
 
-	void reset_render_target();	// reset render target to default
+	static void reset_render_target();	// reset render target to default
+	static void set_render_target(SDL_Texture*); // set the 'tex' as rendering target
 
-private:
-	SDL_Renderer* ren;	// SDL's renderer
-	Color rcolor;		// the draw_color of renderer
+	static SDL_Renderer* ren;	// SDL's renderer
+	static Color rcolor;		// the draw_color of renderer
 };
 
 /*	Texture : wrapper for SDL_Texture	*/
@@ -214,7 +180,7 @@ public:
 		string what() const {	return "Bad_Texture: "+Exception::what();	}
 	};
 
-	Texture(Renderer& renderer);		// initialize and set default values
+	Texture();		// initialize and set default values
 
 	~Texture();	// calls free()
 
@@ -234,8 +200,8 @@ public:
 	// clip is used for clipping the Texture, angle of rotation's sematics are same as that of trig, SDL_RendererFlip { SDL_FLIP_HORIZONTAL, SDL_FLIP_VERTICAL }
 	void render(const Point pos, const SDL_Rect* clip = nullptr, double angle = 0.0, const Point* center = nullptr, SDL_RendererFlip = SDL_FLIP_NONE);
 
-	// set this texture as render target i.e. all the render() calls draw on this texture
-	void set_render_target(int width, int height);
+	// access to SDL_Texture
+	SDL_Texture* texture() const {	return tex;	}
 
 	// width, height getters
 	int width() const	{	return tw;	}
@@ -243,7 +209,6 @@ public:
 
 private:
 	SDL_Texture* tex;
-	SDL_Renderer* ren;
 	Color color_key;	// transparent color of texture
 
 	int tw, th;

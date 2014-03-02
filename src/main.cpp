@@ -1,28 +1,96 @@
 #include "../include/graphics.h"
-#include "physics.cpp"
+#include "../include/physics.h"
 #include <iostream>
 
 using namespace std;
+
 const int WIN_HEIGHT = 1000;
 const int WIN_WIDTH = 1000;
 
-class Solid_Box : public Box, public Texture {
+class Circle_Texture : public Texture {
 public:
-	Solid_Box(Renderer& renderer, int x, int y, int w, int h, Vec2 vel) : Box(Vec2(x, y), Vec2(x+w, y+h)), Texture(renderer)
+	Circle_Texture(unsigned radius) {
+		c.calculate_points(Point(radius, radius), radius);
+
+		create_blank(radius * 2 + 1, radius * 2 + 1, SDL_TEXTUREACCESS_TARGET);
+
+		Renderer::set_render_target(this->texture());
+		Renderer::set_draw_color(Color::BLUE);
+		if (SDL_RenderDrawPoints(Renderer::renderer(), (SDL_Point*)c.data(), c.size()) != 0)
+			cerr<<"ERROR: "<<__func__<<" SDL_RenderDrawPoints failed!\nSDL Error: "<<SDL_GetError()<<'\n';
+		Renderer::reset_render_target();
+	}
+
+private:
+	Circle c;
+};
+
+struct Sphere {
+	Circle_Texture* ctex;
+	Body body;
+	Bounding_Circle shape;
+
+	Sphere (Circle_Texture* texture, Vec2 top_left_position, Vec2 velocity = Vec2(), float inv_mass = 1.0f)
 	{
-		velocity = vel;
-		SDL_Rect r = { 0, 0, w, h };
-		set_render_target(w, h);
-		if (vel.x != 0)
-			SDL_SetRenderDrawColor(renderer.renderer(), 255, 0, 0, 0);
-		SDL_RenderFillRect(renderer.renderer(), &r);
-		renderer.reset_render_target();
+		ctex = texture;
+
+		body.pos = top_left_position + Vec2(ctex->width()/2, ctex->width()/2);
+		body.velocity = velocity;
+		body.gravity_scale = GRAVITY_DEFAULT;
+		body.inv_mass = inv_mass;
+		body.restitution = 1.0f;
+
+		body.shape = &shape;
+		shape.body = &body;
+		shape.rad = ctex->width()/2;
 	}
 
 	void render() {
-		Texture::render(Point(pos.x-width()/2, pos.y-height()/2));
+		ctex->render(Point(body.pos.x - shape.rad, body.pos.y - shape.rad));
 	}
 };
+
+class Rectangle_Texture : public Texture {
+public:
+	Rectangle_Texture(int w, int h) {
+		SDL_Rect rect = { 0, 0, w, h };
+		create_blank(w, h, SDL_TEXTUREACCESS_TARGET);
+
+		Renderer::set_render_target(this->texture());
+		Renderer::set_draw_color(Color::RED);
+		if (SDL_RenderDrawRect(Renderer::renderer(), &rect) != 0)
+			cerr<<"ERROR: "<<__func__<<" SDL_RenderDrawRect failed!\nSDL Error: "<<SDL_GetError()<<'\n';
+		Renderer::reset_render_target();
+	}
+};
+
+struct Slab {
+	Rectangle_Texture* rtex;
+	Body body;
+	Bounding_Box shape;
+
+	Slab (Rectangle_Texture* texture, Vec2 top_left_position, Vec2 velocity = Vec2(), float inv_mass = 0.0f)
+	{
+		rtex = texture;
+
+		body.pos = top_left_position + Vec2(rtex->width()/2, rtex->height()/2);
+		body.velocity = velocity;
+		//body.gravity_scale = GRAVITY_DEFAULT;
+		body.gravity_scale = 0.0f;
+		body.inv_mass = inv_mass;
+		body.restitution = 1.0f;
+
+		body.shape = &shape;
+		shape.body = &body;
+		shape.min = top_left_position;
+		shape.max = top_left_position + Vec2(rtex->width(), rtex->height());
+	}
+
+	void render() {
+		rtex->render(Point(body.pos.x - rtex->width()/2, body.pos.y - rtex->height()/2));
+	}
+};
+
 
 int main() {
 	if (!init()) {
@@ -38,22 +106,37 @@ int main() {
 		win.pos(Point(0, 0));
 		win.resize(WIN_WIDTH, WIN_HEIGHT);
 
-		Renderer ren(win);
+		Renderer::create_renderer(win);
 		
-		const int ITEM_SIZE = 106;
-		const int SIZE = 15;
+		const int ITEM_SIZE = 100;
+		const int SLAB_SIZE = 4;
+		const int ISIZE = 10;
+		const int SSIZE = 20;
 		const int SPEED = 70;
 
-		Solid_Box *item[ITEM_SIZE];
-		item[0] = new Solid_Box(ren, 0, 0, 10, 1000, Vec2(0,0));
-		item[1] = new Solid_Box(ren, 10, 0, 980, 10, Vec2(0,0));
-		item[2] = new Solid_Box(ren, 990, 0, 10, 1000, Vec2(0,0));
-		item[3] = new Solid_Box(ren, 10, 990, 980, 10, Vec2(0,0));
-		for (int i = 4; i < ITEM_SIZE; ++i) {
-			item[i] = new Solid_Box(ren, CLAMP(20, WIN_WIDTH-20, ((i-3)*(2*SIZE))%WIN_WIDTH), CLAMP(20, WIN_HEIGHT-20, (i-3)*(2*SIZE)/WIN_WIDTH), SIZE, SIZE, Vec2(i%SPEED-SPEED/2, i%SPEED-SPEED/2));
-			item[i]->inv_mass = 0.9f;
-			item[i]->restitution = 1.0f;
+		Circle_Texture* tex = new Circle_Texture(ISIZE);
+
+		Sphere *item[ITEM_SIZE];
+		for (int i = 0; i < ITEM_SIZE; ++i) {
+			item[i] = new Sphere(tex, Vec2((i*ISIZE*3)%(WIN_WIDTH-SSIZE*4) + SSIZE*2, (i*ISIZE*3)/(WIN_WIDTH-SSIZE*4) * ISIZE*3 + SSIZE*2), Vec2(i%2 - 1, i%2 - 1));
 		}
+
+		Rectangle_Texture* rtex1 = new Rectangle_Texture(WIN_WIDTH, SSIZE);
+		Rectangle_Texture* rtex2 = new Rectangle_Texture(SSIZE, WIN_HEIGHT - 2 * SSIZE);
+
+		Slab *slab[SLAB_SIZE];
+		slab[0] = new Slab(rtex1, Vec2(0, WIN_HEIGHT - SSIZE));
+		slab[1] = new Slab(rtex1, Vec2(0, 0));
+		slab[2] = new Slab(rtex2, Vec2(0, SSIZE));
+		slab[3] = new Slab(rtex2, Vec2(WIN_WIDTH - SSIZE, SSIZE));
+
+		Scene scene;
+
+		for (int i = 0; i < ITEM_SIZE; ++i)
+			scene.add_body(&(item[i]->body));
+		for (int i = 0; i < SLAB_SIZE; ++i)
+			scene.add_body(&(slab[i]->body));
+
 		unsigned int frames = 0;
 
 		const float fps = 60.0;
@@ -65,7 +148,7 @@ int main() {
 
 		float frame_start = SDL_GetTicks();
 
-		SDL_SetRenderDrawColor(ren.renderer(), 0, 0, 0, 0);
+		Renderer::set_draw_color(Color::BLACK);
 		while (!win.quit()) {
 			timer = SDL_GetTicks();
 			eman.poll_handle();
@@ -76,29 +159,18 @@ int main() {
 			if (accumulator > 0.2f)
 				accumulator = 0.2f;
 			while (accumulator > dt) {
-				// update physics
-				for (int i = 4; i < ITEM_SIZE; ++i)
-					item[i]->move(dt);
-
-				Manifold m;
-				for (int i = 4; i < ITEM_SIZE; ++i) {
-					m.a = item[i];
-					for (int j = 0; j < ITEM_SIZE; ++j) {
-						if (i == j)
-							continue;
-						m.b = item[j];
-						if (collision_box_box(m)) {	resolve_collision(m); positional_correction(m);	}
-					}
-				}
+				scene.step(dt);
 
 				accumulator -= dt;
 			}
 			
 			// render
-			ren.clear_screen();
+			Renderer::clear_screen();
 			for (int i = 0; i < ITEM_SIZE; ++i)
 				item[i]->render();
-			ren.render_screen();
+			for (int i = 0; i < SLAB_SIZE; ++i)
+				slab[i]->render();
+			Renderer::render_screen();
 
 			// stats
 			/*
