@@ -38,7 +38,7 @@ struct Sphere {
 		body.velocity = velocity;
 		body.gravity_scale = GRAVITY_DEFAULT;
 		body.inv_mass = inv_mass;
-		body.restitution = 1.0f;
+		body.restitution = 0.9f;
 
 		body.shape = &shape;
 		shape.body = &body;
@@ -192,6 +192,7 @@ int main() {
 	catch (Exception& e) {
 		cerr<<"Exception : "<<e.what()<<'\n';;
 	}
+	// deallocate memory?
 
 	SDL_Quit();
 	return 0;
