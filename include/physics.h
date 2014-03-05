@@ -16,6 +16,7 @@ struct Shape;
 
 const float GRAVITY_DEFAULT = 1.0f;
 const Vec2 GRAVITY_ACCELERATION = Vec2(0, 10.0f);
+const float FRICTION_EPSILON = 1.0e-30;
 
 struct Body {
 	Body () : id (ID_gen::get_ID ())

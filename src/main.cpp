@@ -39,8 +39,8 @@ struct Sphere {
 		body.gravity_scale = GRAVITY_DEFAULT;
 		body.inv_mass = inv_mass;
 		body.restitution = 0.9f;
-		body.static_friction = 0.5f;
-		body.dynamic_friction = 0.08f;
+		body.static_friction = 0.2f;
+		body.dynamic_friction = 0.005f;
 
 		body.shape = &shape;
 		shape.body = &body;
@@ -80,9 +80,9 @@ struct Slab {
 		//body.gravity_scale = GRAVITY_DEFAULT;
 		body.gravity_scale = 0.0f;
 		body.inv_mass = inv_mass;
-		body.restitution = 1.0f;
-		body.static_friction = 0.8f;
-		body.dynamic_friction = 0.1f;
+		body.restitution = 0.3f;
+		body.static_friction = 0.1f;
+		body.dynamic_friction = 0.001f;
 
 		body.shape = &shape;
 		shape.body = &body;
@@ -114,15 +114,15 @@ int main() {
 		
 		const int ITEM_SIZE = 90;
 		const int SLAB_SIZE = 4;
-		const int ISIZE = 10;
+		const int ISIZE = 20;
 		const int SSIZE = 20;
-		const int SPEED = 70;
+		const int SPEED = 10;
 
 		Circle_Texture* tex = new Circle_Texture(ISIZE);
 
 		Sphere *item[ITEM_SIZE];
 		for (int i = 0; i < ITEM_SIZE; ++i) {
-			item[i] = new Sphere(tex, Vec2((i*ISIZE*3)%(WIN_WIDTH-SSIZE*4) + SSIZE*2, (i*ISIZE*3)/(WIN_WIDTH-SSIZE*4) * ISIZE*3 + SSIZE*2), Vec2(i%2 - 1, i%2 - 1));
+			item[i] = new Sphere(tex, Vec2((i*ISIZE*3)%(WIN_WIDTH-SSIZE*4) + SSIZE*2, (i*ISIZE*3)/(WIN_WIDTH-SSIZE*4) * ISIZE*3 + SSIZE*2), Vec2(i%(SPEED*2) - SPEED, i%(SPEED*2) - SPEED));
 		}
 
 		Rectangle_Texture* rtex1 = new Rectangle_Texture(WIN_WIDTH, SSIZE);
@@ -176,6 +176,7 @@ int main() {
 				slab[i]->render();
 			Renderer::render_screen();
 
+			cerr<<item[0]->body.velocity.x<<' '<<item[0]->body.velocity.y<<'\n';
 			// stats
 			/*
 			++frames;

@@ -5,15 +5,13 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <algorithm>
 #include <cmath>
 #include <map>
 
 using namespace std;
 
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
-
-#define CLAMP(a, b, x) MIN(MAX((a), (x)), (b))
+#define CLAMP(a, b, x) min(max((a), (x)), (b))
 
 /*	Point : wrapper for SDL_Point	*/
 struct Point {

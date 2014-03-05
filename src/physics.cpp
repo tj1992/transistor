@@ -12,7 +12,7 @@ void Manifold::resolve_collision () {
 
 	register float sum_inv_mass = a->inv_mass + b->inv_mass;
 
-	float impulse_magnitude = (-(1 + MIN (a->restitution, b->restitution)) * rv_normal / sum_inv_mass);
+	float impulse_magnitude = (-(1 + min (a->restitution, b->restitution)) * rv_normal / sum_inv_mass);
 	Vec2 impulse = normal * impulse_magnitude;
 
 	Vec2 tangent = rv - normal * dot_product(rv, normal);
@@ -21,8 +21,11 @@ void Manifold::resolve_collision () {
 	float friction_magnitude = -dot_product(rv, tangent) / sum_inv_mass;
 	Vec2 friction_impulse;
 
-	if (abs(friction_magnitude) < impulse_magnitude * sqrt(a->static_friction * a->static_friction + b->static_friction * b->static_friction)) {
-		friction_impulse = tangent * friction_magnitude;
+	float static_friction = sqrt(a->static_friction * a->static_friction + b->static_friction * b->static_friction);
+	if (abs(friction_magnitude) < impulse_magnitude * static_friction) {
+		friction_impulse = tangent * friction_magnitude * static_friction;
+		if (friction_impulse.x < FRICTION_EPSILON || friction_impulse.y < FRICTION_EPSILON)	// don't apply impulse below the limit
+			friction_impulse.set(0.0f, 0.0f);	// this have interesting consequence : the body NEVER stops moving!! NEVER!!
 	}
 	else {
 		friction_impulse = -tangent * impulse_magnitude * sqrt(a->dynamic_friction * a->dynamic_friction + b->dynamic_friction * b->dynamic_friction);
@@ -39,7 +42,7 @@ void Manifold::resolve_collision () {
 void Manifold::positional_correction () {
 	const float ratio = 0.6f;
 	const float slop = 0.05f;
-	Vec2 correction = normal * MAX (penetration - slop, 0.0f ) / (a->inv_mass + b->inv_mass) * ratio;
+	Vec2 correction = normal * max (penetration - slop, 0.0f ) / (a->inv_mass + b->inv_mass) * ratio;
 	a->pos -= correction * a->inv_mass;
 	b->pos += correction * b->inv_mass;
 }
@@ -74,7 +77,7 @@ bool collision_circle_circle(Manifold& m) {
 		return true;
 	}
 	else {	// concentric circles
-		m.penetration = MIN(ra, rb);
+		m.penetration = min(ra, rb);
 		m.normal.set(1.0f, 0.0f);
 
 		return true;
@@ -192,7 +195,6 @@ bool (*collision_callback[Shape::Type::SIZE][Shape::Type::SIZE])(Manifold&) = {
 void Scene::step (float dt) {
 	Body_iterator iter;
 	Body_iterator iter2;
-	Manifold m;
 
 	for (iter = bodies.begin(); iter != bodies.end(); ++iter) {
 		iter->second->integrate_forces(dt);
@@ -204,8 +206,8 @@ void Scene::step (float dt) {
 		for (iter2 = iter, ++iter2; iter2 != bodies.end(); ++iter2) {
 			if (!(iter->second->shape->layer & iter2->second->shape->layer))
 				continue;
-			m.a = iter->second;
-			m.b = iter2->second;
+			
+			Manifold m(iter->second, iter2->second);
 			if ((*collision_callback [iter->second->shape->type][iter2->second->shape->type])(m)) {
 				m.resolve_collision();
 				m.positional_correction();
