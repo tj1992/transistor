@@ -11,18 +11,34 @@ void Manifold::resolve_collision () {
 		return;		// doesn't need resolution as both objects are moving in same direction and will get resolved after next step
 
 	register float sum_inv_mass = a->inv_mass + b->inv_mass;
-	Vec2 impulse = normal * (-(1 + MIN (a->restitution, b->restitution)) * rv_normal / sum_inv_mass);
+
+	float impulse_magnitude = (-(1 + MIN (a->restitution, b->restitution)) * rv_normal / sum_inv_mass);
+	Vec2 impulse = normal * impulse_magnitude;
+
+	Vec2 tangent = rv - normal * dot_product(rv, normal);
+	tangent.normalize();
+
+	float friction_magnitude = -dot_product(rv, tangent) / sum_inv_mass;
+	Vec2 friction_impulse;
+
+	if (abs(friction_magnitude) < impulse_magnitude * sqrt(a->static_friction * a->static_friction + b->static_friction * b->static_friction)) {
+		friction_impulse = tangent * friction_magnitude;
+	}
+	else {
+		friction_impulse = -tangent * impulse_magnitude * sqrt(a->dynamic_friction * a->dynamic_friction + b->dynamic_friction * b->dynamic_friction);
+	}
+
 /*
 	m.a->velocity -= impulse * m.b->inv_mass / sum_inv_mass;
 	m.b->velocity += impulse * m.a->inv_mass / sum_inv_mass;
 */
-	a->velocity -= impulse * a->inv_mass;
-	b->velocity += impulse * b->inv_mass;
+	a->velocity -= (impulse + friction_impulse) * a->inv_mass; 
+	b->velocity += (impulse + friction_impulse) * b->inv_mass;
 }
 
 void Manifold::positional_correction () {
-	const float ratio = 0.9;
-	const float slop = 0.01;
+	const float ratio = 0.6f;
+	const float slop = 0.05f;
 	Vec2 correction = normal * MAX (penetration - slop, 0.0f ) / (a->inv_mass + b->inv_mass) * ratio;
 	a->pos -= correction * a->inv_mass;
 	b->pos += correction * b->inv_mass;

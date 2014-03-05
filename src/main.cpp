@@ -39,6 +39,8 @@ struct Sphere {
 		body.gravity_scale = GRAVITY_DEFAULT;
 		body.inv_mass = inv_mass;
 		body.restitution = 0.9f;
+		body.static_friction = 0.5f;
+		body.dynamic_friction = 0.08f;
 
 		body.shape = &shape;
 		shape.body = &body;
@@ -79,6 +81,8 @@ struct Slab {
 		body.gravity_scale = 0.0f;
 		body.inv_mass = inv_mass;
 		body.restitution = 1.0f;
+		body.static_friction = 0.8f;
+		body.dynamic_friction = 0.1f;
 
 		body.shape = &shape;
 		shape.body = &body;
@@ -108,7 +112,7 @@ int main() {
 
 		Renderer::create_renderer(win);
 		
-		const int ITEM_SIZE = 100;
+		const int ITEM_SIZE = 90;
 		const int SLAB_SIZE = 4;
 		const int ISIZE = 10;
 		const int SSIZE = 20;
@@ -139,7 +143,7 @@ int main() {
 
 		unsigned int frames = 0;
 
-		const float fps = 60.0;
+		const float fps = 30.0;
 		const float dt = 1/fps;
 		float accumulator = 0;
 

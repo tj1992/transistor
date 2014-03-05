@@ -46,6 +46,8 @@ struct Vec2 {
 	}
 
 	void normalize() {
+		if (x == 0.0f && y == 0.0f)
+			return;
 		register float mag = magnitude();
 		set(x/mag, y/mag);
 	}

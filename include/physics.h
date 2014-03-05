@@ -26,6 +26,9 @@ struct Body {
 	Shape *shape;
 	float inv_mass;
 	float restitution;
+
+	float static_friction;
+	float dynamic_friction;
 	
 	Vec2 pos;
 	Vec2 velocity;
