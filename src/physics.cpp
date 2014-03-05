@@ -24,12 +24,14 @@ void Manifold::resolve_collision () {
 	float static_friction = sqrt(a->static_friction * a->static_friction + b->static_friction * b->static_friction);
 	if (abs(friction_magnitude) < impulse_magnitude * static_friction) {
 		friction_impulse = tangent * friction_magnitude * static_friction;
-		if (friction_impulse.x < FRICTION_EPSILON || friction_impulse.y < FRICTION_EPSILON)	// don't apply impulse below the limit
-			friction_impulse.set(0.0f, 0.0f);	// this have interesting consequence : the body NEVER stops moving!! NEVER!!
 	}
 	else {
 		friction_impulse = -tangent * impulse_magnitude * sqrt(a->dynamic_friction * a->dynamic_friction + b->dynamic_friction * b->dynamic_friction);
 	}
+	if (abs(friction_impulse) < FRICTION_EPSILON)	// don't apply impulse below the limit
+		friction_impulse.set (0.0f, 0.0f);
+	if (abs(impulse) < IMPULSE_EPSILON)
+		impulse.set (0.0f, 0.0f);
 
 /*
 	m.a->velocity -= impulse * m.b->inv_mass / sum_inv_mass;

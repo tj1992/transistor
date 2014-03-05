@@ -76,7 +76,11 @@ Vec2 operator / (const Vec2& a, float f);
 
 bool operator == (const Vec2& a, const Vec2& b);
 
+bool operator < (const Vec2& a, const Vec2& b);
+
 float dot_product (const Vec2& a, const Vec2& b);
+
+Vec2 abs(const Vec2& a);
 
 struct Circle {
 	vector<Point> points;

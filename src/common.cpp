@@ -67,6 +67,14 @@ bool operator == (const Vec2& a, const Vec2& b) {
 	return a.x == b.x && a.y == b.y;
 }
 
+bool operator < (const Vec2& a, const Vec2& b) {
+	return a.x < b.x && a.y < b.y;
+}
+
 float dot_product (const Vec2& a, const Vec2& b) {
 	return (a.x * b.x + a.y * b.y);
+}
+
+Vec2 abs (const Vec2& a) {
+	return Vec2(abs(a.x), abs(a.y));
 }

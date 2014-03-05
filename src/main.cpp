@@ -9,13 +9,13 @@ const int WIN_WIDTH = 1000;
 
 class Circle_Texture : public Texture {
 public:
-	Circle_Texture(unsigned radius) {
+	Circle_Texture(unsigned radius, Color color = Color::BLUE) {
 		c.calculate_points(Point(radius, radius), radius);
 
 		create_blank(radius * 2 + 1, radius * 2 + 1, SDL_TEXTUREACCESS_TARGET);
 
 		Renderer::set_render_target(this->texture());
-		Renderer::set_draw_color(Color::BLUE);
+		Renderer::set_draw_color(color);
 		if (SDL_RenderDrawPoints(Renderer::renderer(), (SDL_Point*)c.data(), c.size()) != 0)
 			cerr<<"ERROR: "<<__func__<<" SDL_RenderDrawPoints failed!\nSDL Error: "<<SDL_GetError()<<'\n';
 		Renderer::reset_render_target();
@@ -38,7 +38,7 @@ struct Sphere {
 		body.velocity = velocity;
 		body.gravity_scale = GRAVITY_DEFAULT;
 		body.inv_mass = inv_mass;
-		body.restitution = 0.9f;
+		body.restitution = 1.0f;
 		body.static_friction = 0.2f;
 		body.dynamic_friction = 0.005f;
 
@@ -49,6 +49,58 @@ struct Sphere {
 
 	void render() {
 		ctex->render(Point(body.pos.x - shape.rad, body.pos.y - shape.rad));
+	}
+};
+
+struct Player : public Sphere, public Event_handler {
+	Player (Circle_Texture* texture, Vec2 top_left_position, Vec2 velociy = Vec2(), float inv_mass = 1.0f) :
+	       Sphere(texture, top_left_position, velociy, inv_mass),
+	       Event_handler(SDL_KEYDOWN | SDL_KEYUP)
+	{	
+		body.gravity_scale = 0.0f;
+		body.restitution = 0.3f;
+		body.inv_mass = 0.5f;
+	}
+
+	void handle_event (const SDL_Event& e) {
+		const Vec2 VEL2(50.0f, 0);
+		const Vec2 VEL1(0, 50.0f);
+		const Vec2 Zero(0, 0);
+
+		if (e.key.repeat)
+			return;
+		if (e.type == SDL_KEYDOWN) {
+			switch (e.key.keysym.sym) {
+				case SDLK_UP :
+					body.velocity = -VEL1;
+					break;
+				case SDLK_DOWN :
+					body.velocity = VEL1;
+					break;
+				case SDLK_LEFT :
+					body.velocity = -VEL2;
+					break;
+				case SDLK_RIGHT :
+					body.velocity = VEL2;
+					break;
+			}
+		}
+		else if (e.type == SDL_KEYUP) {
+			switch (e.key.keysym.sym) {
+				case SDLK_UP :
+					body.velocity = Zero;
+					break;
+				case SDLK_DOWN :
+					body.velocity = Zero;
+					break;
+				case SDLK_LEFT :
+					body.velocity = Zero;
+					break;
+				case SDLK_RIGHT :
+					body.velocity = Zero;
+					break;
+			}
+		}	
 	}
 };
 
@@ -80,7 +132,7 @@ struct Slab {
 		//body.gravity_scale = GRAVITY_DEFAULT;
 		body.gravity_scale = 0.0f;
 		body.inv_mass = inv_mass;
-		body.restitution = 0.3f;
+		body.restitution = 0.9f;
 		body.static_friction = 0.1f;
 		body.dynamic_friction = 0.001f;
 
@@ -112,11 +164,11 @@ int main() {
 
 		Renderer::create_renderer(win);
 		
-		const int ITEM_SIZE = 90;
+		const int ITEM_SIZE = 9;
 		const int SLAB_SIZE = 4;
 		const int ISIZE = 20;
 		const int SSIZE = 20;
-		const int SPEED = 10;
+		const int SPEED = 5;
 
 		Circle_Texture* tex = new Circle_Texture(ISIZE);
 
@@ -134,16 +186,22 @@ int main() {
 		slab[2] = new Slab(rtex2, Vec2(0, SSIZE));
 		slab[3] = new Slab(rtex2, Vec2(WIN_WIDTH - SSIZE, SSIZE));
 
+		Circle_Texture* ptex = new Circle_Texture(ISIZE, Color::GREEN);
+		Player p(ptex, Vec2(WIN_WIDTH/2, WIN_HEIGHT/2));
+		
+		eman.add_handler(&p);
+
 		Scene scene;
 
 		for (int i = 0; i < ITEM_SIZE; ++i)
 			scene.add_body(&(item[i]->body));
 		for (int i = 0; i < SLAB_SIZE; ++i)
 			scene.add_body(&(slab[i]->body));
+		scene.add_body(&p.body);
 
 		unsigned int frames = 0;
 
-		const float fps = 30.0;
+		const float fps = 60.0;
 		const float dt = 1/fps;
 		float accumulator = 0;
 
@@ -174,9 +232,10 @@ int main() {
 				item[i]->render();
 			for (int i = 0; i < SLAB_SIZE; ++i)
 				slab[i]->render();
+			p.render();
 			Renderer::render_screen();
 
-			cerr<<item[0]->body.velocity.x<<' '<<item[0]->body.velocity.y<<'\n';
+			//cerr<<item[0]->body.velocity.x<<' '<<item[0]->body.velocity.y<<'\n';
 			// stats
 			/*
 			++frames;
