@@ -11,22 +11,24 @@ void Manifold::resolve_collision () {
 		return;		// doesn't need resolution as both objects are moving in same direction and will get resolved after next step
 
 	register float sum_inv_mass = a->inv_mass + b->inv_mass;
+	if (abs(sum_inv_mass) <= MASS_EPSILON)
+		return;
 
-	float impulse_magnitude = (-(1 + min (a->restitution, b->restitution)) * rv_normal / sum_inv_mass);
+	register float impulse_magnitude = (-(1 + min (a->restitution, b->restitution)) * rv_normal / sum_inv_mass);
 	Vec2 impulse = normal * impulse_magnitude;
 
 	Vec2 tangent = rv - normal * dot_product(rv, normal);
 	tangent.normalize();
 
-	float friction_magnitude = -dot_product(rv, tangent) / sum_inv_mass;
+	register float friction_magnitude = -dot_product(rv, tangent) / sum_inv_mass;
 	Vec2 friction_impulse;
 
-	float static_friction = sqrt(a->static_friction * a->static_friction + b->static_friction * b->static_friction);
+	register float static_friction = (a->static_friction + b->static_friction) / 2;
 	if (abs(friction_magnitude) < impulse_magnitude * static_friction) {
 		friction_impulse = tangent * friction_magnitude * static_friction;
 	}
 	else {
-		friction_impulse = -tangent * impulse_magnitude * sqrt(a->dynamic_friction * a->dynamic_friction + b->dynamic_friction * b->dynamic_friction);
+		friction_impulse = -tangent * impulse_magnitude * (a->dynamic_friction + b->dynamic_friction) / 2;
 	}
 	if (abs(friction_impulse) < FRICTION_EPSILON)	// don't apply impulse below the limit
 		friction_impulse.set (0.0f, 0.0f);

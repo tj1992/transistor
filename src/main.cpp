@@ -4,9 +4,6 @@
 
 using namespace std;
 
-const int WIN_HEIGHT = 1000;
-const int WIN_WIDTH = 1000;
-
 class Circle_Texture : public Texture {
 public:
 	Circle_Texture(unsigned radius, Color color = Color::BLUE) {
@@ -52,58 +49,6 @@ struct Sphere {
 	}
 };
 
-struct Player : public Sphere, public Event_handler {
-	Player (Circle_Texture* texture, Vec2 top_left_position, Vec2 velociy = Vec2(), float inv_mass = 1.0f) :
-	       Sphere(texture, top_left_position, velociy, inv_mass),
-	       Event_handler(SDL_KEYDOWN | SDL_KEYUP)
-	{	
-		body.gravity_scale = 0.0f;
-		body.restitution = 0.3f;
-		body.inv_mass = 0.5f;
-	}
-
-	void handle_event (const SDL_Event& e) {
-		const Vec2 VEL2(50.0f, 0);
-		const Vec2 VEL1(0, 50.0f);
-		const Vec2 Zero(0, 0);
-
-		if (e.key.repeat)
-			return;
-		if (e.type == SDL_KEYDOWN) {
-			switch (e.key.keysym.sym) {
-				case SDLK_UP :
-					body.velocity = -VEL1;
-					break;
-				case SDLK_DOWN :
-					body.velocity = VEL1;
-					break;
-				case SDLK_LEFT :
-					body.velocity = -VEL2;
-					break;
-				case SDLK_RIGHT :
-					body.velocity = VEL2;
-					break;
-			}
-		}
-		else if (e.type == SDL_KEYUP) {
-			switch (e.key.keysym.sym) {
-				case SDLK_UP :
-					body.velocity = Zero;
-					break;
-				case SDLK_DOWN :
-					body.velocity = Zero;
-					break;
-				case SDLK_LEFT :
-					body.velocity = Zero;
-					break;
-				case SDLK_RIGHT :
-					body.velocity = Zero;
-					break;
-			}
-		}	
-	}
-};
-
 class Rectangle_Texture : public Texture {
 public:
 	Rectangle_Texture(int w, int h) {
@@ -112,7 +57,7 @@ public:
 
 		Renderer::set_render_target(this->texture());
 		Renderer::set_draw_color(Color::RED);
-		if (SDL_RenderDrawRect(Renderer::renderer(), &rect) != 0)
+		if (SDL_RenderFillRect(Renderer::renderer(), &rect) != 0)
 			cerr<<"ERROR: "<<__func__<<" SDL_RenderDrawRect failed!\nSDL Error: "<<SDL_GetError()<<'\n';
 		Renderer::reset_render_target();
 	}
@@ -147,6 +92,80 @@ struct Slab {
 	}
 };
 
+struct Player : public Slab, public Event_handler {
+	Player (Rectangle_Texture* texture, Vec2 top_left_position, Vec2 velociy = Vec2(), float inv_mass = 1.0f) :
+	       Slab(texture, top_left_position, velociy, inv_mass),
+	       Event_handler(SDL_KEYDOWN | SDL_KEYUP)
+	{	
+		body.gravity_scale = GRAVITY_DEFAULT;
+		body.restitution = 0.2f;
+		body.inv_mass = 0.1f;
+
+		body.static_friction = 0.9f;
+		body.dynamic_friction = 0.5f;
+	}
+
+	void handle_event (const SDL_Event& e) {
+		Vec2 VEL2(30.0f, 0);
+		Vec2 VEL1(0, 10.0f);
+		const Vec2 F2(1000.0f, 0);
+		const Vec2 F1(0, 40000.0f);
+		const Vec2 Zero(0, 0);
+
+		VEL1 = Zero;
+		//VEL2 = Zero;
+
+		//if (e.key.repeat) return;
+
+		if (e.type == SDL_KEYDOWN) {
+			switch (e.key.keysym.sym) {
+				case SDLK_UP :
+					if (abs(body.velocity.y) <= 0.0f + VELOCITY_EPSILON * 2) {
+						body.velocity -= VEL1;
+						body.force -= F1;
+					}
+					break;
+					/*
+				case SDLK_DOWN :
+					body.velocity += VEL1;
+					body.force += F1;
+					break;
+					*/
+				case SDLK_LEFT :
+					if (-(VEL2.x) < body.velocity.x) {
+						body.velocity -= (body.velocity + VEL2);
+						body.force -= F2;
+					}
+					break;
+				case SDLK_RIGHT :
+					if (body.velocity.x < (VEL2.x)) {
+						body.velocity += (VEL2 - body.velocity);
+						body.force += F2;
+					}
+					break;
+			}
+		}
+		/*
+		else if (e.type == SDL_KEYUP) {
+			switch (e.key.keysym.sym) {
+				case SDLK_UP :
+					body.velocity += VEL1;
+					break;
+				case SDLK_DOWN :
+					body.velocity -= VEL1;
+					break;
+				case SDLK_LEFT :
+					body.velocity += VEL2;
+					break;
+				case SDLK_RIGHT :
+					body.velocity -= VEL2;
+					break;
+			}
+		}	
+		*/
+	}
+};
+
 
 int main() {
 	if (!init()) {
@@ -160,15 +179,19 @@ int main() {
 		eman.add_handler(&win);
 
 		win.pos(Point(0, 0));
+
+		const int WIN_HEIGHT = 1000;
+		const int WIN_WIDTH = 1800;
+
 		win.resize(WIN_WIDTH, WIN_HEIGHT);
 
 		Renderer::create_renderer(win);
 		
 		const int ITEM_SIZE = 9;
-		const int SLAB_SIZE = 4;
 		const int ISIZE = 20;
-		const int SSIZE = 20;
-		const int SPEED = 5;
+		const int SSIZE = 50;
+		const int SPEED = 10;
+		const int SLICE = 5;
 
 		Circle_Texture* tex = new Circle_Texture(ISIZE);
 
@@ -179,15 +202,27 @@ int main() {
 
 		Rectangle_Texture* rtex1 = new Rectangle_Texture(WIN_WIDTH, SSIZE);
 		Rectangle_Texture* rtex2 = new Rectangle_Texture(SSIZE, WIN_HEIGHT - 2 * SSIZE);
+		Rectangle_Texture* rtex3 = new Rectangle_Texture(WIN_WIDTH / 2, SSIZE);
+		Rectangle_Texture* rtex4 = new Rectangle_Texture(WIN_WIDTH / 4, SLICE);
 
+		const int SLAB_SIZE = 12;
 		Slab *slab[SLAB_SIZE];
 		slab[0] = new Slab(rtex1, Vec2(0, WIN_HEIGHT - SSIZE));
 		slab[1] = new Slab(rtex1, Vec2(0, 0));
 		slab[2] = new Slab(rtex2, Vec2(0, SSIZE));
 		slab[3] = new Slab(rtex2, Vec2(WIN_WIDTH - SSIZE, SSIZE));
+		slab[4] = new Slab(rtex3, Vec2(WIN_WIDTH / 2 - SSIZE, WIN_HEIGHT / 2 + SSIZE * 2));
+		slab[5] = new Slab(rtex3, Vec2(SSIZE, WIN_HEIGHT / 2 - SSIZE * 2));
+		slab[6] = new Slab(rtex4, Vec2(SSIZE, WIN_HEIGHT - SSIZE - SLICE * 6));
+		slab[7] = new Slab(rtex4, Vec2(SSIZE + SLICE, WIN_HEIGHT - SSIZE - SLICE * 5));
+		slab[8] = new Slab(rtex4, Vec2(SSIZE + SLICE * 2, WIN_HEIGHT - SSIZE - SLICE * 4));
+		slab[9] = new Slab(rtex4, Vec2(SSIZE + SLICE * 3, WIN_HEIGHT - SSIZE - SLICE * 3));
+		slab[10] = new Slab(rtex4, Vec2(SSIZE + SLICE * 4, WIN_HEIGHT - SSIZE - SLICE * 2));
+		slab[11] = new Slab(rtex4, Vec2(SSIZE + SLICE * 5, WIN_HEIGHT - SSIZE - SLICE));
 
-		Circle_Texture* ptex = new Circle_Texture(ISIZE, Color::GREEN);
-		Player p(ptex, Vec2(WIN_WIDTH/2, WIN_HEIGHT/2));
+		//Circle_Texture* ptex = new Circle_Texture(ISIZE * 2, Color::GREEN);
+		Rectangle_Texture* ptex = new Rectangle_Texture(ISIZE * 2, ISIZE * 3);
+		Player p(ptex, Vec2(WIN_WIDTH/2 , WIN_HEIGHT/2 - ISIZE));
 		
 		eman.add_handler(&p);
 
@@ -215,6 +250,9 @@ int main() {
 			timer = SDL_GetTicks();
 			eman.poll_handle();
 
+			if (win.is_hidden())
+				continue;
+
 			accumulator += timer - frame_start;
 			frame_start = timer;
 
@@ -235,7 +273,7 @@ int main() {
 			p.render();
 			Renderer::render_screen();
 
-			//cerr<<item[0]->body.velocity.x<<' '<<item[0]->body.velocity.y<<'\n';
+			cerr<<p.body.velocity.x<<' '<<p.body.velocity.y<<'\n';
 			// stats
 			/*
 			++frames;

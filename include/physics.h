@@ -15,9 +15,12 @@ struct ID_gen {
 struct Shape;
 
 const float GRAVITY_DEFAULT = 1.0f;
+const float MASS_EPSILON = 1.0e-10;
+const float VELOCITY_EPSILON = 0.5f;
+
 const Vec2 GRAVITY_ACCELERATION = Vec2(0, 10.0f);
-const Vec2 FRICTION_EPSILON = Vec2(1.0e-20, 1.0e-20);
-const Vec2 IMPULSE_EPSILON = Vec2(1.0e-20, 1.0e-20);
+const Vec2 FRICTION_EPSILON = Vec2(1.0e-15, 1.0e-15);
+const Vec2 IMPULSE_EPSILON = Vec2(1.0e-15, 1.0e-15);
 
 struct Body {
 	Body () : id (ID_gen::get_ID ())
